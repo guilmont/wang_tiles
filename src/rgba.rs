@@ -18,6 +18,13 @@ impl RGBA {
     pub fn lerp(one: &RGBA, two: &RGBA, coeff: f32) -> RGBA {
         return coeff * one + (1.0 - coeff) * two;
     }
+
+    pub fn gamma_correct(&mut self) {
+        let gamma = 2.2f32;
+        self.r = self.r.powf(1.0 / gamma);
+        self.g = self.g.powf(1.0 / gamma);
+        self.b = self.b.powf(1.0 / gamma);
+    }
 }
 
 impl std::ops::Add<&RGBA> for &RGBA {
