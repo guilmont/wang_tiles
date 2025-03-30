@@ -8,6 +8,18 @@ pub struct RGBA {
     pub a:f32
 }
 
+impl RGBA {
+    pub fn red()   -> RGBA { return RGBA{ r: 1.0, g: 0.0, b: 0.0, a: 1.0 }; }
+    pub fn green() -> RGBA { return RGBA{ r: 0.0, g: 1.0, b: 0.0, a: 1.0 }; }
+    pub fn blue()  -> RGBA { return RGBA{ r: 0.0, g: 0.0, b: 1.0, a: 1.0 }; }
+    pub fn black() -> RGBA { return RGBA{ r: 0.0, g: 0.0, b: 0.0, a: 1.0 }; }
+    pub fn white() -> RGBA { return RGBA{ r: 1.0, g: 1.0, b: 1.0, a: 1.0 }; }
+
+    pub fn lerp(one: &RGBA, two: &RGBA, coeff: f32) -> RGBA {
+        return coeff * one + (1.0 - coeff) * two;
+    }
+}
+
 impl std::ops::Add<&RGBA> for &RGBA {
     type Output = RGBA;
     fn add(self, other: &RGBA) -> RGBA {
@@ -39,18 +51,5 @@ impl std::ops::Mul<&RGBA> for f32 {
             b: self * val.b,
             a: self * val.a,
         };
-    }
-}
-
-
-impl RGBA {
-    pub fn red()   -> RGBA { return RGBA{ r: 1.0, g: 0.0, b: 0.0, a: 1.0 }; }
-    pub fn green() -> RGBA { return RGBA{ r: 0.0, g: 1.0, b: 0.0, a: 1.0 }; }
-    pub fn blue()  -> RGBA { return RGBA{ r: 0.0, g: 0.0, b: 1.0, a: 1.0 }; }
-    pub fn black() -> RGBA { return RGBA{ r: 0.0, g: 0.0, b: 0.0, a: 1.0 }; }
-    pub fn white() -> RGBA { return RGBA{ r: 1.0, g: 1.0, b: 1.0, a: 1.0 }; }
-
-    pub fn lerp(one: &RGBA, two: &RGBA, coeff: f32) -> RGBA {
-        return coeff * one + (1.0 - coeff) * two;
     }
 }
