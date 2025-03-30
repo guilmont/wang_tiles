@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
 mod rgba;
-mod texture;
+mod matrix;
 
 use rgba::RGBA;
-use texture::Texture;
+use matrix::Matrix;
 
 // Common bit setup for tiles
 const BOTTOM: u8 = 0;
@@ -12,42 +12,25 @@ const RIGHT: u8 = 1;
 const TOP: u8 = 2;
 const LEFT: u8 = 3;
 
+fn save_ppm(mat: & Matrix<RGBA>, filepath: &str) -> Result<(), String> {
+    use std::io::Write;
 
-struct Matrix {
-    cols: usize,
-    rows: usize,
-    data: Vec<u8>,
+    let arq = std::fs::File::create(filepath).map_err(|e| e.to_string())?;
+    let mut buf = std::io::BufWriter::new(arq);
+
+    buf.write_all(format!("P6\n{} {} 255\n", mat.width, mat.height).as_bytes())
+        .map_err(|e| e.to_string())?;
+
+    mat.for_each(|(_,_), pix| {
+        let r = (pix.r * 255.0) as u8;
+        let g = (pix.g * 255.0) as u8;
+        let b = (pix.b * 255.0) as u8;
+        buf.write_all(&[r,g, b]).map_err(|e| e.to_string()).unwrap();
+    });
+
+    buf.flush().map_err(|e| e.to_string())?;
+    Ok(())
 }
-
-impl Matrix {
-    fn new(num_cols: usize, num_rows: usize) -> Matrix {
-        let mut data = Vec::<u8>:: new();
-        data.resize(num_cols * num_rows, 0u8);
-        return Matrix {
-            cols: num_cols,
-            rows: num_rows,
-            data
-        };
-    }
-
-    fn at_mut(&mut self, x: usize, y: usize) -> &mut u8 {
-        return &mut self.data[y * self.cols + x];
-    }
-
-    fn at(&self, x: usize, y: usize) -> u8 {
-        return self.data[y * self.cols + x];
-    }
-
-    fn print(&self) {
-        for k in 0..self.rows {
-            for l in 0..self.cols {
-                print!("{:04b} ", self.at(l, k));
-            }
-            println!();
-        }
-    }
-}
-
 
 fn wang_shader(frag: &mut RGBA, u: f32, v: f32, id: u8) {
     let bot = v <= 0.0 && (v.abs() >= u.abs());
@@ -69,8 +52,8 @@ fn generate_tiles_image(tile_size: usize, filepath: &str) -> Result<(), String> 
     let height: usize = 4 * tile_size;
 
     // Generate an atlas with all the tiles we will need
-    let mut tex = Texture::new(width, height);
-    tex.for_each(|(x, y), pixel: &mut RGBA| {
+    let mut tex = Matrix::<RGBA>::new(width, height, &RGBA::black());
+    tex.for_each_mut(|(x, y), pixel: &mut RGBA| {
         // To identify where tiles begin and end
         if x % tile_size == 0 || y % tile_size == 0 {
             *pixel = RGBA::black();
@@ -88,7 +71,7 @@ fn generate_tiles_image(tile_size: usize, filepath: &str) -> Result<(), String> 
         let v = 1.0 - 2.0 * v;
         wang_shader(pixel, u, v, id as u8);
     });
-    tex.save_ppm(filepath)?;
+    save_ppm(&tex, filepath)?;
 
     Ok(())
 }
@@ -103,23 +86,23 @@ fn main() -> Result<(), String> {
     generate_tiles_image(TILE, "tiles.ppm")?;
 
     // Generate grid
-    let mut grid = Matrix::new(WIDTH, HEIGHT);
+    let mut grid = Matrix::<u8>::new(WIDTH, HEIGHT, &0u8);
     // First element is completely random
     *grid.at_mut(0,0) = rand::random::<u8>() % 16;
     // First column
-    for l in 1..grid.cols {
+    for l in 1..grid.width {
         let rng = rand::random::<u8>() % 16;
         *grid.at_mut(l,0) = (rng & !(1 << LEFT))
                           | (((grid.at(l-1, 0) >> RIGHT) & 1) << LEFT);
     }
     // Go thru other rows
-    for k in 1..grid.rows {
+    for k in 1..grid.height {
         // The first element depends only on top element
         let rng = rand::random::<u8>() % 16;
         *grid.at_mut(0,k) = (rng & !(1 << TOP))
                           | (((grid.at(0, k-1) >> BOTTOM) & 1) << TOP);
         // Bulk
-        for l in 1..grid.cols {
+        for l in 1..grid.width {
             let rnd = rand::random::<u8>() % 16;
             *grid.at_mut(l,k) = (rnd & !((1 << TOP) | (1 << LEFT)))
                               | (((grid.at(l, k-1) >> BOTTOM) & 1) << TOP)
@@ -127,12 +110,12 @@ fn main() -> Result<(), String> {
         }
     }
 
-    let mut tex = Texture::new(grid.cols * TILE, grid.rows * TILE);
-    tex.for_each(|(x,y), pixel: &mut RGBA| {
-        // if x % TILE == 0 || y % TILE == 0 {
-        //     *pixel = RGBA::black();
-        //     return;
-        // }
+    let mut tex = Matrix::<RGBA>::new(WIDTH * TILE, HEIGHT * TILE, &RGBA::black());
+    tex.for_each_mut(|(x,y), pixel: &mut RGBA| {
+        if x % TILE == 0 || y % TILE == 0 {
+            *pixel = RGBA::black();
+            return;
+        }
         // Get id from grid
         let id = grid.at(x / TILE, y / TILE);
         // Get coordinates from 0.0 to 1.0
@@ -141,9 +124,9 @@ fn main() -> Result<(), String> {
         // Re-center coordinates and scale
         let u = 2.0 * u - 1.0;
         let v = 1.0 - 2.0 * v;
-        wang_shader(pixel, u, v, id);
+        wang_shader(pixel, u, v, *id);
     });
-    tex.save_ppm("output.ppm")?;
+    save_ppm(&tex, "output.ppm")?;
 
     Ok(())
 }
